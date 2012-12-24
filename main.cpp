@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 	std::string c_directory;
 	std::string c_pattern;
 	std::vector<std::string> c_empty_v;
-	bool c_trim;
+	bool c_trim = false, c_safe = false,  c_recursive = false;
 	/////////
 	std::string prog = "Tag Mp3 files from filename";
 	po::options_description desc(prog);
@@ -29,7 +29,9 @@ int main(int argc, char **argv) {
 	//Add options
 	desc.add_options()	("help,h", "this message")
 						("pattern,p", po::value<std::string>(), "pattern to match")
+						("recursive,r", "recursive iteration")
 						("trim,t", "remove leading and trailing space from fields")
+						("safe,s", "safe mode, do not update files")
 						("empty,e", po::value<std::vector<std::string> >(), "only update tags if the tag specified with this option is initially empty")
 						("directory,d", po::value<std::string>(&c_directory)->required(), "path to folder (required)");
 
@@ -47,8 +49,14 @@ int main(int argc, char **argv) {
 		if (vm.count("pattern")) {
 			c_pattern = vm["pattern"].as<std::string>();
 		}
+		if(vm.count("recursive")) {
+			c_recursive = true;
+		}
 		if (vm.count("trim")) {
 			c_trim = true;
+		}
+		if (vm.count("safe")) {
+			c_safe = true;
 		}
 		if (vm.count("empty")) {
 			c_empty_v = vm["empty"].as< std::vector<std::string> >();
@@ -71,7 +79,8 @@ int main(int argc, char **argv) {
 		p.print();
 		FileTagger tagger(p);
 		tagger.SetEmptyFieldConstraint(c_empty_v);
-		tagger.TagDirectory(c_directory);
+		tagger.SetSafeMode(c_safe);
+		tagger.Tag(c_directory, c_recursive);
 		//
 	} catch (std::exception& e) {
 		if (!vm.count("help")) {
@@ -81,9 +90,7 @@ int main(int argc, char **argv) {
 		}
 
 	}
-	// We can now use those params in our program
-	//list_files("/home/akavo/workspace");
-	//test();
+
 	return 0;
 }
 

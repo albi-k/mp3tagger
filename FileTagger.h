@@ -19,7 +19,7 @@ void list_files(std::string dir);
 
 void test();
 
-enum FieldType {Title = 0, Artist, Album, Delimiter, Unknown};
+enum FieldType {Title = 0, Artist, Album, TrackNo, Delimiter, Unknown};
 
 std::string FieldTypeToString(FieldType type);
 
@@ -73,17 +73,22 @@ public:
 	virtual ~FileTagger();
 
 	void SetEmptyFieldConstraint(std::vector<std::string> empty_fields);
-	void TagDirectory(std::string dir);
+	void SetSafeMode(bool safe_mode);
+	void Tag(std::string path, bool recursive);
+	void TagDirectory(std::string dir, bool recursive);
 	void TagFile(std::string file);
-	void TagFile(fs::path file);
 
 protected:
 	void UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldmap);
 	bool CheckEmptyFields(TagLib::FileRef &file);
+	void TagDirectory(fs::path dir);
+	void TagDirectoryRecursive(fs::path dir);
+	void TagFile(fs::path file);
 
 protected:
 	Pattern &_pattern;
 	std::vector<std::string> _empty_fields;
+	bool _safe;
 };
 
 #endif /* FILETAG_H_ */

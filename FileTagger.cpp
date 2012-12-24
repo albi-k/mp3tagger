@@ -11,51 +11,6 @@
 
 #include "common.h"
 
-void list_files(std::string dir) {
-	fs::path files_dir(dir);
-
-	try {
-		if (!fs::exists(files_dir) || !fs::is_directory(files_dir)) {
-			std::cout << "Invalid directory: " << files_dir.string()
-					<< std::endl;
-			return;
-		}
-
-		for (fs::recursive_directory_iterator end, dir(files_dir); dir != end;
-				++dir) {
-			fs::path p = dir->path();
-
-			if (fs::is_regular_file(p)) {
-
-				/*if (p.extension().string() != ".jpg"
-						&& p.extension().string() != ".tif"
-						&& p.extension().string() != ".png")
-					continue;*/
-
-				std::string file = p.string();
-				std::cout << "File: " << p.filename().string() << "\n";
-
-			} else if (fs::is_directory(p)) {
-				std::cout << "Directory: " << p.string() << std::endl;
-
-			} else {
-				std::cout << "Error reading: " << p.string() << std::endl;
-			}
-		}
-	} catch (const fs::filesystem_error& ex) {
-		std::cout << ex.what() << std::endl;
-	}
-
-}
-
-void test() {
-	TagLib::FileRef f("Fracx - For The World (D&B Edit).mp3");
-	TagLib::String artist = f.tag()->artist();
-	std::cout << artist << std::endl;
-	//f.tag()->setArtist("Fracx");
-	//f.save();
-
-}
 
 std::string FieldTypeToString(FieldType type)
 {
@@ -70,6 +25,9 @@ std::string FieldTypeToString(FieldType type)
 			break;
 		case Album:
 			str_type = "Album";
+			break;
+		case TrackNo:
+			str_type = "Track#";
 			break;
 		case Delimiter:
 			str_type = "Delimiter";
@@ -126,6 +84,8 @@ bool Pattern::parse()
 
 	Field album("<Album>", Album);
 	_nNamedFields += find_in_pattern(album);
+	Field trackno("<Track#>", TrackNo);
+	_nNamedFields += find_in_pattern(trackno);
 
 	//Everything else must be delimiters
 	size_t prev_pos = 0;
@@ -205,17 +165,18 @@ bool Pattern::match_string(std::string &file_stem, position_map &out)
 	typedef std::vector<std::pair<size_t,size_t> > intervals;
 	intervals field_intervals;
 	position_map delimiters;
-	long int pos = -1;
+	size_t pos = 0;
 	//Ensure sequence of delimiters exists
 	for(position_map::iterator it = _delimiters.begin(); it != _delimiters.end(); ++it)
 	{
 		Field &field = it->second;
-		pos = file_stem.find(field._content, pos+1);
+		pos = file_stem.find(field._content, pos);
 		if(pos == std::string::npos) {
 			std::cout << "Rejected: Delimiter `" << field._content << "` not found(s)";
 			return false;
 		}
 		delimiters.insert(std::pair<size_t,Field>(pos, field));	//insert delimiter
+		++pos;
 	}
 	//TODO:check for existence of additional delimiters
 
@@ -278,6 +239,7 @@ void Pattern::print()
 
 FileTagger::FileTagger(Pattern &p)
 : _pattern(p)
+, _safe(false)
 {
 
 }
@@ -292,9 +254,81 @@ void FileTagger::SetEmptyFieldConstraint(std::vector<std::string> empty_fields)
 	_empty_fields = empty_fields;
 }
 
-void FileTagger::TagDirectory(std::string dir)
+void FileTagger::SetSafeMode(bool safe_mode)
+{
+	_safe = safe_mode;
+}
+
+void FileTagger::Tag(std::string path, bool recursive)
+{
+	fs::path path_to_dir_or_file(path);
+
+	try
+	{
+		if (!fs::exists(path_to_dir_or_file)) {
+			std::cout << "Invalid path: " << path_to_dir_or_file.string() << std::endl;
+			return;
+		}
+
+		if(fs::is_directory(path_to_dir_or_file))
+		{
+			TagDirectory(path, recursive);
+		}
+		else if (fs::is_regular_file(path_to_dir_or_file))
+		{
+			TagFile(path_to_dir_or_file);
+		}
+		else
+			std::cout << "Invalid path: " << path_to_dir_or_file.string() << std::endl;
+
+	} catch (const fs::filesystem_error& ex) {
+		std::cout << ex.what() << std::endl;
+	}
+}
+
+void FileTagger::TagDirectory(std::string dir, bool recursive)
 {
 	fs::path files_dir(dir);
+	if(recursive)
+		TagDirectoryRecursive(files_dir);
+	else
+		TagDirectory(files_dir);
+}
+
+void FileTagger::TagDirectory(fs::path files_dir)
+{
+
+	try {
+		if (!fs::exists(files_dir) || !fs::is_directory(files_dir)) {
+			std::cout << "Invalid directory: " << files_dir.string() << std::endl;
+			return;
+		}
+
+		for (fs::directory_iterator end, dir(files_dir); dir != end;
+				++dir) {
+			fs::path p = dir->path();
+
+			if (fs::is_regular_file(p)) {
+
+				if (p.extension().string() != ".mp3")
+					continue;
+
+				TagFile(p);
+
+			} else if (fs::is_directory(p)) {
+				std::cout << "Directory: " << p.string() << std::endl;
+
+			} else {
+				std::cout << "Error reading: " << p.string() << std::endl;
+			}
+		}
+	} catch (const fs::filesystem_error& ex) {
+		std::cout << ex.what() << std::endl;
+	}
+}
+
+void FileTagger::TagDirectoryRecursive(fs::path files_dir)
+{
 
 	try {
 		if (!fs::exists(files_dir) || !fs::is_directory(files_dir)) {
@@ -355,18 +389,30 @@ void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldm
 {
 	for (Pattern::position_map::iterator it = fieldmap.begin();	it!=fieldmap.end(); ++it) {
 		Field &field = it->second;
-		if(field._type == Artist) {
-			file.tag()->setArtist(field._content);
+
+		switch(field._type)
+		{
+		case Artist:
+			if(!_safe) file.tag()->setArtist(field._content);
 			std::cout << "Artist<-`" << field._content << "` | ";
-		}else if(field._type == Title) {
-			file.tag()->setTitle(field._content);
+			break;
+		case Title:
+			if(!_safe) file.tag()->setTitle(field._content);
 			std::cout << "Title<-`" << field._content << "` | ";
-		}else if(field._type == Album) {
-			file.tag()->setAlbum(field._content);
+			break;
+		case Album:
+			if(!_safe) file.tag()->setAlbum(field._content);
 			std::cout << "Album<-`" << field._content << "` | ";
+			break;
+		case TrackNo:
+			if(!_safe) file.tag()->setTrack(atoi(field._content.c_str()));
+			std::cout << "Track#<-`" << field._content << "` | ";
+			break;
+		default:
+			break;
 		}
 	}
-	file.save();
+	if(!_safe) file.save();
 }
 
 bool FileTagger::CheckEmptyFields(TagLib::FileRef &file)
