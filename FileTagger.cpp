@@ -26,8 +26,17 @@ std::string FieldTypeToString(FieldType type)
 		case Album:
 			str_type = "Album";
 			break;
+		case Genre:
+			str_type = "Genre";
+			break;
+		case Comment:
+			str_type = "Comment";
+			break;
 		case TrackNo:
 			str_type = "Track#";
+			break;
+		case Year:
+			str_type = "Year";
 			break;
 		case Delimiter:
 			str_type = "Delimiter";
@@ -89,8 +98,17 @@ bool Pattern::parse()
 	Field album("<Album>", Album);
 	_nNamedFields += find_in_pattern(album);
 
+	Field genre("<Genre>", Genre);
+	_nNamedFields += find_in_pattern(genre);
+
+	Field comment("<Comment>", Comment);
+	_nNamedFields += find_in_pattern(comment);
+
 	Field trackno("<Track#>", TrackNo);
 	_nNamedFields += find_in_pattern(trackno);
+
+	Field year("<Year>", Year);
+	_nNamedFields += find_in_pattern(year);
 
 	Field ignore("<Ignore>", Ignore);
 	_nNamedFields += find_in_pattern(ignore);
@@ -432,10 +450,23 @@ void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldm
 			if(!_safe) file.tag()->setAlbum(field._content);
 			std::cout << "Album<-`" << field._content << "` | ";
 			break;
+		case Genre:
+			if(!_safe) file.tag()->setGenre(field._content);
+			std::cout << "Genre<-`" << field._content << "` | ";
+			break;
+		case Comment:
+			if(!_safe) file.tag()->setComment(field._content);
+			std::cout << "Comment<-`" << field._content << "` | ";
+			break;
 		case TrackNo:
 			if(!_safe) file.tag()->setTrack(atoi(field._content.c_str()));
 			std::cout << "Track#<-`" << field._content << "` | ";
 			break;
+		case Year:
+			if(!_safe) file.tag()->setYear(atoi(field._content.c_str()));
+			std::cout << "Year<-`" << field._content << "` | ";
+			break;
+
 		default:
 			break;
 		}

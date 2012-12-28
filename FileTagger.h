@@ -19,7 +19,8 @@ void list_files(std::string dir);
 
 void test();
 
-enum FieldType {Title = 0, Artist, Album, TrackNo, Ignore, Delimiter, Unknown};
+enum FieldType {Title = 0, Artist, Album, TrackNo, Genre,
+				Year, Comment, Ignore, Delimiter, Unknown};
 
 std::string FieldTypeToString(FieldType type);
 
