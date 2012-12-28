@@ -32,6 +32,9 @@ std::string FieldTypeToString(FieldType type)
 		case Delimiter:
 			str_type = "Delimiter";
 			break;
+		case Ignore:
+			str_type = "Ignore";
+			break;
 		default:
 			str_type = "Unknown";
 			break;
@@ -72,6 +75,7 @@ bool Pattern::parse()
 {
 	_nNamedFields = 0;
 	_nDelFields = 0;
+	_nPathSeparators = 0;
 	_structure.clear();
 	_delimiters.clear();
 
@@ -84,8 +88,12 @@ bool Pattern::parse()
 
 	Field album("<Album>", Album);
 	_nNamedFields += find_in_pattern(album);
+
 	Field trackno("<Track#>", TrackNo);
 	_nNamedFields += find_in_pattern(trackno);
+
+	Field ignore("<Ignore>", Ignore);
+	_nNamedFields += find_in_pattern(ignore);
 
 	//Everything else must be delimiters
 	size_t prev_pos = 0;
@@ -157,10 +165,12 @@ bool Pattern::parse_helper(size_t pos, size_t size, size_t prev_pos, size_t prev
 	Field del(delimiter, Delimiter);
 	_delimiters.insert(std::pair<size_t,Field>(del_start, del));
 	++_nDelFields;
+	if(delimiter== "/" || delimiter=="\\")
+		++_nPathSeparators;
 	return true;
 }
 
-bool Pattern::match_string(std::string &file_stem, position_map &out)
+bool Pattern::match(std::string &file_str, position_map &out)
 {
 	typedef std::vector<std::pair<size_t,size_t> > intervals;
 	intervals field_intervals;
@@ -170,9 +180,9 @@ bool Pattern::match_string(std::string &file_stem, position_map &out)
 	for(position_map::iterator it = _delimiters.begin(); it != _delimiters.end(); ++it)
 	{
 		Field &field = it->second;
-		pos = file_stem.find(field._content, pos);
+		pos = file_str.find(field._content, pos);
 		if(pos == std::string::npos) {
-			std::cout << "Rejected: Delimiter `" << field._content << "` not found(s)";
+			std::cout << "Rejected: Delimiter `" << field._content << "` not found\n";
 			return false;
 		}
 		delimiters.insert(std::pair<size_t,Field>(pos, field));	//insert delimiter
@@ -189,16 +199,17 @@ bool Pattern::match_string(std::string &file_stem, position_map &out)
 		Field &field = it->second;
 		if(idx_end-idx_start > 0) {
 			field_intervals.push_back(std::pair<size_t,size_t>(idx_start, idx_end));
-			idx_start = idx_end+field.size();
 		}
+		idx_start = idx_end+field.size();
 	}
 	//check tail
-	if(idx_start != file_stem.size())
-		field_intervals.push_back(std::pair<size_t,size_t>(idx_start, file_stem.size()));
+	if(idx_start != file_str.size())
+		field_intervals.push_back(std::pair<size_t,size_t>(idx_start, file_str.size()));
 
-	if(_nNamedFields != field_intervals.size())
-		std::cout << "Rejected: Field count mismatch";
-
+	if(_nNamedFields != field_intervals.size()) {
+		std::cout << "Rejected: Field count mismatch\n";
+		return false;
+	}
 	//Extract fields
 	int n = 0;
 	for(position_map::iterator it = _structure.begin(); it != _structure.end(); ++it)
@@ -207,7 +218,7 @@ bool Pattern::match_string(std::string &file_stem, position_map &out)
 		if(field._type == Delimiter)
 			continue;
 		std::pair<size_t,size_t> interval = field_intervals[n]; ++n;
-		field._content = file_stem.substr(interval.first, interval.second-interval.first);
+		field._content = file_str.substr(interval.first, interval.second-interval.first);
 		if(_trim)
 			boost::algorithm::trim(field._content);
 
@@ -235,6 +246,16 @@ void Pattern::print()
 	std::cout << std::endl;
 }
 
+bool Pattern::begins_with_separator()
+{
+	if(!_structure.empty() &&
+			_structure.begin()->second._type == Delimiter &&
+			(_structure.begin()->second._content == "/" ||
+					_structure.begin()->second._content == "\\"))
+		return true;
+	return false;
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 
 FileTagger::FileTagger(Pattern &p)
@@ -258,11 +279,10 @@ void FileTagger::SetSafeMode(bool safe_mode)
 {
 	_safe = safe_mode;
 }
-
+//TODO: DUPLICATE FIELDS
 void FileTagger::Tag(std::string path, bool recursive)
 {
-	fs::path path_to_dir_or_file(path);
-
+	fs::path path_to_dir_or_file = fs::path(path);
 	try
 	{
 		if (!fs::exists(path_to_dir_or_file)) {
@@ -288,7 +308,7 @@ void FileTagger::Tag(std::string path, bool recursive)
 
 void FileTagger::TagDirectory(std::string dir, bool recursive)
 {
-	fs::path files_dir(dir);
+	fs::path files_dir = fs::absolute(fs::path(dir));
 	if(recursive)
 		TagDirectoryRecursive(files_dir);
 	else
@@ -367,19 +387,27 @@ void FileTagger::TagFile(std::string file)
 
 void FileTagger::TagFile(fs::path file)
 {
-	std::cout << "File: " << file.filename().string() << " | ";
+	fs::path filec = fs::canonical(file);
+	std::cout << "Canonical Path: " << filec << std::endl;
 
-	TagLib::FileRef f(file.string().c_str());
+	TagLib::FileRef f(filec.string().c_str());
 	if(!CheckEmptyFields(f)) {
-		std::cout << "Rejected: Non-Empty field(s)\n";
+		std::cout << "Rejected: Non-Empty field(s)\n\n";
 		return;
 	}
 	Pattern::position_map fields;
-	std::string stem = file.stem().string();
-	if(_pattern.match_string(stem, fields))
+
+	std::string file_name;
+	if(!ExtractRelevantFileName(filec, file_name)) {
+		std::cout << "Rejected: Filename path separator mismatch\n\n";
+		return;
+	}
+	std::cout << "RelevantFileName: " << file_name << std::endl;
+
+	if(_pattern.match(file_name, fields))
 	{
 		UpdateTags(f, fields);
-		std::cout << "Done\n";
+		std::cout << "Done\n\n";
 		return;
 	}
 
@@ -428,4 +456,35 @@ bool FileTagger::CheckEmptyFields(TagLib::FileRef &file)
 			return false;
 	}
 	return true;
+}
+
+bool FileTagger::ExtractRelevantFileName(fs::path file_path, std::string &out)
+{
+	out = "";
+	size_t nSeparators = _pattern.get_separator_count();
+	if(nSeparators)
+	{
+		size_t nTokens = _pattern.begins_with_separator() ? nSeparators-1 : nSeparators;
+		//Explode path
+		std::string parentpath = file_path.parent_path().string();
+		std::vector<std::string> tokens;
+		boost::split(tokens, parentpath, boost::is_any_of("/\\"));
+		if(nTokens > tokens.size())
+			return false;
+		boost::filesystem::path slash("/");
+		std::string platform_slash = slash.make_preferred().native();
+
+		if(_pattern.begins_with_separator())
+			out += platform_slash;
+		while(!tokens.empty() && nTokens)
+		{
+			--nTokens;
+			out += tokens.back();
+			out += platform_slash;
+			tokens.pop_back();
+		}
+
+	}
+	 out += file_path.stem().string();
+	 return true;
 }

@@ -19,7 +19,7 @@ void list_files(std::string dir);
 
 void test();
 
-enum FieldType {Title = 0, Artist, Album, TrackNo, Delimiter, Unknown};
+enum FieldType {Title = 0, Artist, Album, TrackNo, Ignore, Delimiter, Unknown};
 
 std::string FieldTypeToString(FieldType type);
 
@@ -54,15 +54,19 @@ protected:
 	bool _trim;
 	size_t _nNamedFields;
 	size_t _nDelFields;
+	size_t _nPathSeparators;
 
 	bool parse();
 	bool parse_helper(size_t pos, size_t size, size_t prev_pos, size_t prev_size);
 	int find_in_pattern(Field needle);
 
 public:
-	bool match_string(std::string &file_stem, position_map &out);
+	bool match(std::string &file_stem, position_map &out);
 	void print();
 	static int find_insert_field(Field needle, std::string &haystack, position_map &out);
+
+	size_t get_separator_count() { return _nPathSeparators; }
+	bool begins_with_separator();
 };
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +88,7 @@ protected:
 	void TagDirectory(fs::path dir);
 	void TagDirectoryRecursive(fs::path dir);
 	void TagFile(fs::path file);
+	bool ExtractRelevantFileName(fs::path file_path, std::string &out);
 
 protected:
 	Pattern &_pattern;
