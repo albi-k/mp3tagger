@@ -78,7 +78,7 @@ Pattern::~Pattern()
 
 //A valid pattern is:
 //A sequence of one or more known fields (<Artist> ...)
-//separated by any non-space delimiter string
+//separated by any delimiter string
 
 bool Pattern::parse()
 {
@@ -176,7 +176,7 @@ bool Pattern::parse_helper(size_t pos, size_t size, size_t prev_pos, size_t prev
 	}
 	std::string delimiter = _pattern.substr(del_start, del_end-del_start);
 	if(_trim) {
-		boost::algorithm::trim(delimiter);
+		boost::algorithm::trim_if(delimiter, boost::is_any_of(_trim_chars));
 		if(delimiter.size() < 1)
 			return false;
 	}
@@ -238,7 +238,7 @@ bool Pattern::match(std::string &file_str, position_map &out)
 		std::pair<size_t,size_t> interval = field_intervals[n]; ++n;
 		field._content = file_str.substr(interval.first, interval.second-interval.first);
 		if(_trim)
-			boost::algorithm::trim(field._content);
+			boost::algorithm::trim_if(field._content, boost::is_any_of(_trim_chars));
 
 		out.insert(std::pair<size_t,Field>(interval.first, field));
 	}
@@ -479,11 +479,13 @@ bool FileTagger::CheckEmptyFields(TagLib::FileRef &file)
 	for (std::vector<std::string>::iterator it = _empty_fields.begin();
 			it!=_empty_fields.end(); ++it) {
 		std::string &field = *it;
-		if(field == "<Artist>" && !file.tag()->artist().isEmpty())
-			return false;
-		if(field == "<Title>" && !file.tag()->title().isEmpty())
-			return false;
-		if(field == "<Album>" && !file.tag()->album().isEmpty())
+		if(		(field == "<Artist>" && !file.tag()->artist().isEmpty())
+			|| 	(field == "<Title>" && !file.tag()->title().isEmpty())
+			|| 	(field == "<Album>" && !file.tag()->album().isEmpty())
+			|| 	(field == "<Genre>" && !file.tag()->genre().isEmpty())
+			|| 	(field == "<Comment>" && !file.tag()->comment().isEmpty())
+			|| 	(field == "<Year>" && !file.tag()->year())
+			|| 	(field == "<Track#>" && !file.tag()->track()) )
 			return false;
 	}
 	return true;

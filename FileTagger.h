@@ -53,6 +53,8 @@ protected:
 	std::string _pattern;
 	bool _valid;
 	bool _trim;
+	std::string _trim_chars;
+
 	size_t _nNamedFields;
 	size_t _nDelFields;
 	size_t _nPathSeparators;
@@ -68,6 +70,7 @@ public:
 
 	size_t get_separator_count() { return _nPathSeparators; }
 	bool begins_with_separator();
+	void SetTrimChars(std::string chars) { _trim_chars = chars; }
 };
 
 //////////////////////////////////////////////////////////////////////////////////

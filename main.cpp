@@ -20,6 +20,7 @@ namespace po = boost::program_options;
 int main(int argc, char **argv) {
 	std::string c_directory;
 	std::string c_pattern;
+	std::string c_trim_chars;
 	std::vector<std::string> c_empty_v;
 	bool c_trim = false, c_safe = false,  c_recursive = false;
 	/////////
@@ -30,7 +31,7 @@ int main(int argc, char **argv) {
 	desc.add_options()	("help,h", "this message")
 						("pattern,p", po::value<std::string>(), "pattern to match")
 						("recursive,r", "recursive iteration")
-						("trim,t", "remove leading and trailing space from fields")
+						("trim,t", po::value<std::string>()->implicit_value(" "), "remove leading and trailing space from fields")
 						("safe,s", "safe mode, do not update files")
 						("empty,e", po::value<std::vector<std::string> >(), "only update tags if the tag specified with this option is initially empty")
 						("directory,d", po::value<std::string>(&c_directory)->required(), "path to folder (required)");
@@ -54,6 +55,7 @@ int main(int argc, char **argv) {
 		}
 		if (vm.count("trim")) {
 			c_trim = true;
+			c_trim_chars = vm["trim"].as<std::string>();
 		}
 		if (vm.count("safe")) {
 			c_safe = true;
@@ -76,6 +78,7 @@ int main(int argc, char **argv) {
 
 		// Execute here
 		Pattern p(c_pattern, c_trim);
+		p.SetTrimChars(c_trim_chars);
 		p.print();
 		FileTagger tagger(p);
 		tagger.SetEmptyFieldConstraint(c_empty_v);
