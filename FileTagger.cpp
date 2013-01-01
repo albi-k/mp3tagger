@@ -8,7 +8,7 @@
 #include "FileTagger.h"
 #include <boost/algorithm/string.hpp>
 #include <iostream>
-
+#include <id3/misc_support.h>
 #include "common.h"
 
 
@@ -276,9 +276,10 @@ bool Pattern::begins_with_separator()
 
 //////////////////////////////////////////////////////////////////////////////////
 
-FileTagger::FileTagger(Pattern &p)
+FileTagger::FileTagger(Pattern &p, bool replace_non_empty)
 : _pattern(p)
 , _safe(false)
+, _replace(replace_non_empty)
 {
 
 }
@@ -408,7 +409,7 @@ void FileTagger::TagFile(fs::path file)
 	fs::path filec = fs::canonical(file);
 	std::cout << "Canonical Path: " << filec << std::endl;
 
-	TagLib::FileRef f(filec.string().c_str());
+	ID3_Tag f(filec.string().c_str());
 	if(!CheckEmptyFields(f)) {
 		std::cout << "Rejected: Non-Empty field(s)\n\n";
 		return;
@@ -431,39 +432,40 @@ void FileTagger::TagFile(fs::path file)
 
 }
 
-void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldmap)
+void FileTagger::UpdateTags(ID3_Tag &tag, Pattern::position_map &fieldmap)
 {
+
 	for (Pattern::position_map::iterator it = fieldmap.begin();	it!=fieldmap.end(); ++it) {
 		Field &field = it->second;
 
 		switch(field._type)
 		{
 		case Artist:
-			if(!_safe) file.tag()->setArtist(field._content);
+			if(!_safe) ID3_AddArtist(&tag, field._content.c_str(), _replace);
 			std::cout << "Artist<-`" << field._content << "` | ";
 			break;
 		case Title:
-			if(!_safe) file.tag()->setTitle(field._content);
+			if(!_safe) ID3_AddTitle(&tag, field._content.c_str(), _replace);
 			std::cout << "Title<-`" << field._content << "` | ";
 			break;
 		case Album:
-			if(!_safe) file.tag()->setAlbum(field._content);
+			if(!_safe) ID3_AddAlbum(&tag, field._content.c_str(), _replace);
 			std::cout << "Album<-`" << field._content << "` | ";
 			break;
 		case Genre:
-			if(!_safe) file.tag()->setGenre(field._content);
+			if(!_safe) ID3_AddGenre(&tag, field._content.c_str(), _replace);
 			std::cout << "Genre<-`" << field._content << "` | ";
 			break;
 		case Comment:
-			if(!_safe) file.tag()->setComment(field._content);
+			if(!_safe) ID3_AddComment(&tag, field._content.c_str(), _replace);
 			std::cout << "Comment<-`" << field._content << "` | ";
 			break;
 		case TrackNo:
-			if(!_safe) file.tag()->setTrack(atoi(field._content.c_str()));
+			if(!_safe) ID3_AddTrack(&tag, atoi(field._content.c_str()), 0, _replace);
 			std::cout << "Track#<-`" << field._content << "` | ";
 			break;
 		case Year:
-			if(!_safe) file.tag()->setYear(atoi(field._content.c_str()));
+			if(!_safe) ID3_AddYear(&tag, field._content.c_str(), _replace);
 			std::cout << "Year<-`" << field._content << "` | ";
 			break;
 
@@ -471,21 +473,23 @@ void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldm
 			break;
 		}
 	}
-	if(!_safe) file.save();
+	if(!_safe) tag.Update();
+
 }
 
-bool FileTagger::CheckEmptyFields(TagLib::FileRef &file)
+bool FileTagger::CheckEmptyFields(ID3_Tag &tag)
 {
 	for (std::vector<std::string>::iterator it = _empty_fields.begin();
 			it!=_empty_fields.end(); ++it) {
 		std::string &field = *it;
-		if(		(field == "<Artist>" && !file.tag()->artist().isEmpty())
-			|| 	(field == "<Title>" && !file.tag()->title().isEmpty())
-			|| 	(field == "<Album>" && !file.tag()->album().isEmpty())
-			|| 	(field == "<Genre>" && !file.tag()->genre().isEmpty())
-			|| 	(field == "<Comment>" && !file.tag()->comment().isEmpty())
-			|| 	(field == "<Year>" && !file.tag()->year())
-			|| 	(field == "<Track#>" && !file.tag()->track()) )
+
+		if	(	(field == "<Artist>" && !ID3_GetArtist(&tag))
+			|| 	(field == "<Title>" && !ID3_GetTitle(&tag))
+			|| 	(field == "<Album>" && !ID3_GetAlbum(&tag))
+			|| 	(field == "<Genre>" && !ID3_GetGenre(&tag))
+			|| 	(field == "<Comment>" && !ID3_GetComment(&tag))
+			|| 	(field == "<Year>" && !ID3_GetYear(&tag))
+			|| 	(field == "<Track#>" && !ID3_GetTrackNum(&tag)) )
 			return false;
 	}
 	return true;

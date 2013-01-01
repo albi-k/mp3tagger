@@ -9,15 +9,14 @@
 #define FILETAG_H_
 
 #include <boost/filesystem.hpp>
-#include <taglib/fileref.h>
-#include <taglib/tag.h>
+#include <id3/tag.h>
 #include <map>
 #include <vector>
 
 namespace fs = boost::filesystem;
-void list_files(std::string dir);
 
-void test();
+
+//////////////////////////////////////////////////////////////////////////////////
 
 enum FieldType {Title = 0, Artist, Album, TrackNo, Genre,
 				Year, Comment, Ignore, Delimiter, Unknown};
@@ -77,7 +76,7 @@ public:
 
 class FileTagger {
 public:
-	FileTagger(Pattern &p);
+	FileTagger(Pattern &p, bool replace_non_empty=true);
 	virtual ~FileTagger();
 
 	void SetEmptyFieldConstraint(std::vector<std::string> empty_fields);
@@ -87,8 +86,8 @@ public:
 	void TagFile(std::string file);
 
 protected:
-	void UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldmap);
-	bool CheckEmptyFields(TagLib::FileRef &file);
+	void UpdateTags(ID3_Tag &file, Pattern::position_map &fieldmap);
+	bool CheckEmptyFields(ID3_Tag &file);
 	void TagDirectory(fs::path dir);
 	void TagDirectoryRecursive(fs::path dir);
 	void TagFile(fs::path file);
@@ -97,7 +96,8 @@ protected:
 protected:
 	Pattern &_pattern;
 	std::vector<std::string> _empty_fields;
-	bool _safe;
+	bool _safe;			//safe mode: don't write changes
+	bool _replace;		//replace if tag exists?
 };
 
 #endif /* FILETAG_H_ */
