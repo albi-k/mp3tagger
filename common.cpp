@@ -21,11 +21,17 @@ const char* Exc::what() const throw()
 
 /////////////////////////////////////////////
 
-bool isField(std::string field)
+bool isField(tstring field)
 {
-	if(field == "<Artist>"
-	|| field == "<Title>"
-	|| field == "<Album>")
+	if(field == _T("<Artist>")
+	|| field == _T("<Title>")
+	|| field == _T("<Album>")
+	|| field == _T("<Genre>")
+	|| field == _T("<Comment>")
+	|| field == _T("<Track#>")
+	|| field == _T("<Year>")
+	|| field == _T("<Ignore>")
+	)
 		return true;
 	return false;
 }

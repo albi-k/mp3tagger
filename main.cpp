@@ -18,10 +18,10 @@ namespace po = boost::program_options;
 
 
 int main(int argc, char **argv) {
-	std::string c_directory;
-	std::string c_pattern;
-	std::string c_trim_chars;
-	std::vector<std::string> c_empty_v;
+	tstring c_directory;
+	tstring c_pattern;
+	tstring c_trim_chars;
+	std::vector<tstring> c_empty_v;
 	bool c_trim = false, c_safe = false,  c_recursive = false;
 	/////////
 	std::string prog = "Tag Mp3 files from filename";
@@ -29,12 +29,12 @@ int main(int argc, char **argv) {
 
 	//Add options
 	desc.add_options()	("help,h", "this message")
-						("pattern,p", po::value<std::string>(), "pattern to match")
+						("pattern,p", po::wvalue<tstring>(), "pattern to match")
 						("recursive,r", "recursive iteration")
-						("trim,t", po::value<std::string>()->implicit_value(" "), "remove leading and trailing space from fields")
+						("trim,t", po::wvalue<tstring>()->implicit_value(_T(" "), " "), "remove leading and trailing space from fields")
 						("safe,s", "safe mode, do not update files")
-						("empty,e", po::value<std::vector<std::string> >(), "only update tags if the tag specified with this option is initially empty")
-						("directory,d", po::value<std::string>(&c_directory)->required(), "path to folder (required)");
+						("empty,e", po::wvalue<std::vector<tstring> >(), "only update tags if the tag specified with this option is initially empty")
+						("directory,d", po::wvalue<tstring>(&c_directory)->required(), "path to folder (required)");
 
 	po::positional_options_description positionalOptions;
 	positionalOptions.add("directory", 1);
@@ -48,24 +48,26 @@ int main(int argc, char **argv) {
 
 		po::variables_map parameters;
 		if (vm.count("pattern")) {
-			c_pattern = vm["pattern"].as<std::string>();
+			c_pattern = vm["pattern"].as<tstring>();
 		}
 		if(vm.count("recursive")) {
 			c_recursive = true;
 		}
 		if (vm.count("trim")) {
 			c_trim = true;
-			c_trim_chars = vm["trim"].as<std::string>();
+			c_trim_chars = vm["trim"].as<tstring>();
 		}
 		if (vm.count("safe")) {
 			c_safe = true;
+			tcout << "Safe mode is on" << std::endl;
 		}
 		if (vm.count("empty")) {
-			c_empty_v = vm["empty"].as< std::vector<std::string> >();
-			for(std::vector<std::string>::iterator it = c_empty_v.begin(); it!=c_empty_v.end(); ++it) {
+			c_empty_v = vm["empty"].as< std::vector<tstring> >();
+			for(std::vector<tstring>::iterator it = c_empty_v.begin(); it!=c_empty_v.end(); ++it) {
 				if(!isField(*it)) {
-					std::string error = *it + " is not a valid field";
-					throw Exc(error);
+					tstring error = *it + _T(" is not a valid field");
+					std::string err(error.begin(), error.end());
+					throw Exc(err);
 				}
 			}
 		}
@@ -87,8 +89,8 @@ int main(int argc, char **argv) {
 		//
 	} catch (std::exception& e) {
 		if (!vm.count("help")) {
-			std::cerr << "Error: " << e.what() << std::endl;
-			std::cerr << "Try -h or --help for help." << std::endl;
+			tcerr << "Error: " << e.what() << std::endl;
+			tcerr << "Try -h or --help for help." << std::endl;
 			return -1;
 		}
 

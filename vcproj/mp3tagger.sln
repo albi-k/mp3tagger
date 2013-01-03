@@ -1,0 +1,44 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mp3tagger", "mp3tagger.vcxproj", "{02509F8F-F5AD-4BBA-9DC9-89B64200F229}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		NASM Debug|Win32 = NASM Debug|Win32
+		NASM Debug|x64 = NASM Debug|x64
+		NASM Release|Win32 = NASM Release|Win32
+		NASM Release|x64 = NASM Release|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+		Template|Win32 = Template|Win32
+		Template|x64 = Template|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Debug|Win32.ActiveCfg = Debug|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Debug|Win32.Build.0 = Debug|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Debug|x64.ActiveCfg = Debug|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Debug|x64.Build.0 = Debug|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Debug|Win32.ActiveCfg = Debug|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Debug|Win32.Build.0 = Debug|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Debug|x64.ActiveCfg = Debug|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Debug|x64.Build.0 = Debug|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Release|Win32.ActiveCfg = Release|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Release|Win32.Build.0 = Release|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Release|x64.ActiveCfg = Release|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.NASM Release|x64.Build.0 = Release|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Release|Win32.ActiveCfg = Release|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Release|Win32.Build.0 = Release|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Release|x64.ActiveCfg = Release|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Release|x64.Build.0 = Release|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Template|Win32.ActiveCfg = Release|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Template|Win32.Build.0 = Release|Win32
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Template|x64.ActiveCfg = Release|x64
+		{02509F8F-F5AD-4BBA-9DC9-89B64200F229}.Template|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

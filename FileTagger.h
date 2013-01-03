@@ -8,33 +8,39 @@
 #ifndef FILETAG_H_
 #define FILETAG_H_
 
-#include <boost/filesystem.hpp>
-#include <id3/tag.h>
+#define TAGLIB_STATIC 
+
+#include <taglib/fileref.h>
+#include <taglib/tag.h>
 #include <map>
 #include <vector>
-
-namespace fs = boost::filesystem;
+#include "common.h"
 
 
 //////////////////////////////////////////////////////////////////////////////////
 
 enum FieldType {Title = 0, Artist, Album, TrackNo, Genre,
-				Year, Comment, Ignore, Delimiter, Unknown};
+				Year, Comment, Ignore, Delimiter, _Unknown};
 
-std::string FieldTypeToString(FieldType type);
+tstring FieldTypeToString(FieldType type);
 
 //////////////////////////////////////////////////////////////////////////////////
 
 class Field {
 private:
-	Field(): _type(Unknown) {}
+	Field(): _type(_Unknown) {}
+	static std::string content_narrow;
+	const char* ToCharArr(std::string &src);
+	const char* ToCharArr(std::wstring &src);
 public:
-	Field(std::string content, FieldType type);
+	Field(tstring content, FieldType type);
 	virtual ~Field();
 public:
-	std::string _content;
+	tstring _content;
 	FieldType _type;
 	size_t size() { return _content.size(); }
+
+	const char* ToCharArr();
 };
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -43,16 +49,16 @@ class Pattern {
 public:
 	typedef std::map<size_t, Field> position_map;
 
-	Pattern(std::string format, bool trim);
+	Pattern(tstring format, bool trim);
 	~Pattern();
 protected:
 	position_map _structure;
 	position_map _delimiters;
 
-	std::string _pattern;
+	tstring _pattern;
 	bool _valid;
 	bool _trim;
-	std::string _trim_chars;
+	tstring _trim_chars;
 
 	size_t _nNamedFields;
 	size_t _nDelFields;
@@ -63,13 +69,13 @@ protected:
 	int find_in_pattern(Field needle);
 
 public:
-	bool match(std::string &file_stem, position_map &out);
+	bool match(tstring &file_stem, position_map &out);
 	void print();
-	static int find_insert_field(Field needle, std::string &haystack, position_map &out);
+	static int find_insert_field(Field needle, tstring &haystack, position_map &out);
 
 	size_t get_separator_count() { return _nPathSeparators; }
 	bool begins_with_separator();
-	void SetTrimChars(std::string chars) { _trim_chars = chars; }
+	void SetTrimChars(tstring chars) { _trim_chars = chars; }
 };
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -79,23 +85,23 @@ public:
 	FileTagger(Pattern &p, bool replace_non_empty=true);
 	virtual ~FileTagger();
 
-	void SetEmptyFieldConstraint(std::vector<std::string> empty_fields);
+	void SetEmptyFieldConstraint(std::vector<tstring> empty_fields);
 	void SetSafeMode(bool safe_mode);
-	void Tag(std::string path, bool recursive);
-	void TagDirectory(std::string dir, bool recursive);
-	void TagFile(std::string file);
+	void Tag(tstring path, bool recursive);
+	void TagDirectory(tstring dir, bool recursive);
+	void TagFile(tstring file);
 
 protected:
-	void UpdateTags(ID3_Tag &file, Pattern::position_map &fieldmap);
-	bool CheckEmptyFields(ID3_Tag &file);
+	void UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldmap);
+	bool CheckEmptyFields(TagLib::FileRef &file);
 	void TagDirectory(fs::path dir);
 	void TagDirectoryRecursive(fs::path dir);
 	void TagFile(fs::path file);
-	bool ExtractRelevantFileName(fs::path file_path, std::string &out);
+	bool ExtractRelevantFileName(fs::path file_path, tstring &out);
 
 protected:
 	Pattern &_pattern;
-	std::vector<std::string> _empty_fields;
+	std::vector<tstring> _empty_fields;
 	bool _safe;			//safe mode: don't write changes
 	bool _replace;		//replace if tag exists?
 };

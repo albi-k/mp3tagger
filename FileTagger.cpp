@@ -8,52 +8,51 @@
 #include "FileTagger.h"
 #include <boost/algorithm/string.hpp>
 #include <iostream>
-#include <id3/misc_support.h>
-#include "common.h"
+#include <cstring>
 
-
-std::string FieldTypeToString(FieldType type)
+tstring FieldTypeToString(FieldType type)
 {
-	std::string str_type;
+	tstring str_type;
 	switch(type)
 	{
 		case Title:
-			str_type = "Title";
+			str_type = _T("Title";)
 			break;
 		case Artist:
-			str_type = "Artist";
+			str_type = _T("Artist");
 			break;
 		case Album:
-			str_type = "Album";
+			str_type = _T("Album");
 			break;
 		case Genre:
-			str_type = "Genre";
+			str_type = _T("Genre");
 			break;
 		case Comment:
-			str_type = "Comment";
+			str_type = _T("Comment");
 			break;
 		case TrackNo:
-			str_type = "Track#";
+			str_type = _T("Track#");
 			break;
 		case Year:
-			str_type = "Year";
+			str_type = _T("Year");
 			break;
 		case Delimiter:
-			str_type = "Delimiter";
+			str_type = _T("Delimiter");
 			break;
 		case Ignore:
-			str_type = "Ignore";
+			str_type = _T("Ignore");
 			break;
 		default:
-			str_type = "Unknown";
+			str_type = _T("_Unknown");
 			break;
 	}
 	return str_type;
 }
 
 //////////////////////////////////////////////////////////////////////////////////
+std::string Field::content_narrow;
 
-Field::Field(std::string content, FieldType type)
+Field::Field(tstring content, FieldType type)
 : _content(content)
 , _type(type)
 {
@@ -63,9 +62,26 @@ Field::~Field()
 {
 }
 
+const char* Field::ToCharArr(std::string &src)
+{
+	return src.c_str();
+}
+
+const char* Field::ToCharArr(std::wstring &src)
+{
+	content_narrow.reserve(src.size());
+	// wide to UTF-8
+	content_narrow.assign(src.begin(), src.end());
+	return content_narrow.c_str();
+}
+
+const char* Field::ToCharArr()
+{
+	return ToCharArr(_content);
+}
 //////////////////////////////////////////////////////////////////////////////////
 
-Pattern::Pattern(std::string format, bool trim)
+Pattern::Pattern(tstring format, bool trim)
 : _pattern(format)
 , _trim(trim)
 {
@@ -89,28 +105,28 @@ bool Pattern::parse()
 	_delimiters.clear();
 
 	//Find all occurrences of the allowed fields
-	Field title("<Title>", Title);
+	Field title(_T("<Title>"), Title);
 	_nNamedFields += find_in_pattern(title);
 
-	Field artist("<Artist>", Artist);
+	Field artist(_T("<Artist>"), Artist);
 	_nNamedFields += find_in_pattern(artist);
 
-	Field album("<Album>", Album);
+	Field album(_T("<Album>"), Album);
 	_nNamedFields += find_in_pattern(album);
 
-	Field genre("<Genre>", Genre);
+	Field genre(_T("<Genre>"), Genre);
 	_nNamedFields += find_in_pattern(genre);
 
-	Field comment("<Comment>", Comment);
+	Field comment(_T("<Comment>"), Comment);
 	_nNamedFields += find_in_pattern(comment);
 
-	Field trackno("<Track#>", TrackNo);
+	Field trackno(_T("<Track#>"), TrackNo);
 	_nNamedFields += find_in_pattern(trackno);
 
-	Field year("<Year>", Year);
+	Field year(_T("<Year>"), Year);
 	_nNamedFields += find_in_pattern(year);
 
-	Field ignore("<Ignore>", Ignore);
+	Field ignore(_T("<Ignore>"), Ignore);
 	_nNamedFields += find_in_pattern(ignore);
 
 	//Everything else must be delimiters
@@ -147,12 +163,12 @@ int Pattern::find_in_pattern(Field needle)
 	return find_insert_field(needle, _pattern, _structure);
 }
 
-int Pattern::find_insert_field(Field needle, std::string &haystack, position_map &out)
+int Pattern::find_insert_field(Field needle, tstring &haystack, position_map &out)
 {
 	int count = 0;
 
 	size_t pos = haystack.find(needle._content, 0);
-	while(pos != std::string::npos)
+	while(pos != tstring::npos)
 	{
 		++count;
 		out.insert(std::pair<size_t,Field>(pos, needle));
@@ -174,7 +190,7 @@ bool Pattern::parse_helper(size_t pos, size_t size, size_t prev_pos, size_t prev
 		}
 		return false;
 	}
-	std::string delimiter = _pattern.substr(del_start, del_end-del_start);
+	tstring delimiter = _pattern.substr(del_start, del_end-del_start);
 	if(_trim) {
 		boost::algorithm::trim_if(delimiter, boost::is_any_of(_trim_chars));
 		if(delimiter.size() < 1)
@@ -183,12 +199,12 @@ bool Pattern::parse_helper(size_t pos, size_t size, size_t prev_pos, size_t prev
 	Field del(delimiter, Delimiter);
 	_delimiters.insert(std::pair<size_t,Field>(del_start, del));
 	++_nDelFields;
-	if(delimiter== "/" || delimiter=="\\")
+	if(delimiter==_T("/") || delimiter==_T("\\"))
 		++_nPathSeparators;
 	return true;
 }
 
-bool Pattern::match(std::string &file_str, position_map &out)
+bool Pattern::match(tstring &file_str, position_map &out)
 {
 	typedef std::vector<std::pair<size_t,size_t> > intervals;
 	intervals field_intervals;
@@ -199,8 +215,8 @@ bool Pattern::match(std::string &file_str, position_map &out)
 	{
 		Field &field = it->second;
 		pos = file_str.find(field._content, pos);
-		if(pos == std::string::npos) {
-			std::cout << "Rejected: Delimiter `" << field._content << "` not found\n";
+		if(pos == tstring::npos) {
+			tcout << "Rejected: Delimiter `" << field._content << "` not found\n\n";
 			return false;
 		}
 		delimiters.insert(std::pair<size_t,Field>(pos, field));	//insert delimiter
@@ -225,7 +241,7 @@ bool Pattern::match(std::string &file_str, position_map &out)
 		field_intervals.push_back(std::pair<size_t,size_t>(idx_start, file_str.size()));
 
 	if(_nNamedFields != field_intervals.size()) {
-		std::cout << "Rejected: Field count mismatch\n";
+		tcout << "Rejected: Field count mismatch\n\n";
 		return false;
 	}
 	//Extract fields
@@ -248,28 +264,28 @@ bool Pattern::match(std::string &file_str, position_map &out)
 void Pattern::print()
 {
 	if(!_valid) {
-		std::cout << "Pattern::print(): Invalid pattern" << std::endl;
+		tcout << "Pattern::print(): Invalid pattern" << std::endl;
 		return;
 	}
-	std::cout << "Trim=" << _trim << std::endl;
+	tcout << "Trim=" << _trim << std::endl;
 	for(position_map::iterator it = _structure.begin(); it != _structure.end(); ++it)
 	{
 			size_t pos = it->first;
 			Field &field = it->second;
-			std::cout << "Type " << FieldTypeToString(field._type);
+			tcout << "Type " << FieldTypeToString(field._type);
 			if(field._type == Delimiter)
-				std::cout << "`" << field._content << "`";
-			std::cout << " at pos= " << pos << std::endl;
+				tcout << "`" << field._content << "`";
+			tcout << " at pos= " << pos << std::endl;
 	}
-	std::cout << std::endl;
+	tcout << std::endl;
 }
 
 bool Pattern::begins_with_separator()
 {
 	if(!_structure.empty() &&
 			_structure.begin()->second._type == Delimiter &&
-			(_structure.begin()->second._content == "/" ||
-					_structure.begin()->second._content == "\\"))
+			(_structure.begin()->second._content == _T("/") ||
+					_structure.begin()->second._content == _T("\\")))
 		return true;
 	return false;
 }
@@ -289,7 +305,7 @@ FileTagger::~FileTagger()
 
 }
 
-void FileTagger::SetEmptyFieldConstraint(std::vector<std::string> empty_fields)
+void FileTagger::SetEmptyFieldConstraint(std::vector<tstring> empty_fields)
 {
 	_empty_fields = empty_fields;
 }
@@ -299,13 +315,13 @@ void FileTagger::SetSafeMode(bool safe_mode)
 	_safe = safe_mode;
 }
 //TODO: DUPLICATE FIELDS
-void FileTagger::Tag(std::string path, bool recursive)
+void FileTagger::Tag(tstring path, bool recursive)
 {
 	fs::path path_to_dir_or_file = fs::path(path);
 	try
 	{
 		if (!fs::exists(path_to_dir_or_file)) {
-			std::cout << "Invalid path: " << path_to_dir_or_file.string() << std::endl;
+			tcout << _T("Invalid path: ") << path_to_dir_or_file.string<tstring>() << std::endl;
 			return;
 		}
 
@@ -318,14 +334,14 @@ void FileTagger::Tag(std::string path, bool recursive)
 			TagFile(path_to_dir_or_file);
 		}
 		else
-			std::cout << "Invalid path: " << path_to_dir_or_file.string() << std::endl;
+			tcout << _T("Invalid path: ") << path_to_dir_or_file.string<tstring>() << std::endl;
 
 	} catch (const fs::filesystem_error& ex) {
-		std::cout << ex.what() << std::endl;
+		tcout << ex.what() << std::endl;
 	}
 }
 
-void FileTagger::TagDirectory(std::string dir, bool recursive)
+void FileTagger::TagDirectory(tstring dir, bool recursive)
 {
 	fs::path files_dir = fs::absolute(fs::path(dir));
 	if(recursive)
@@ -339,7 +355,7 @@ void FileTagger::TagDirectory(fs::path files_dir)
 
 	try {
 		if (!fs::exists(files_dir) || !fs::is_directory(files_dir)) {
-			std::cout << "Invalid directory: " << files_dir.string() << std::endl;
+			tcout << _T("Invalid directory: ") << files_dir.string<tstring>() << std::endl;
 			return;
 		}
 
@@ -348,21 +364,23 @@ void FileTagger::TagDirectory(fs::path files_dir)
 			fs::path p = dir->path();
 
 			if (fs::is_regular_file(p)) {
-
-				if (p.extension().string() != ".mp3")
+				tstring extension = p.extension().string<tstring>();
+				boost::algorithm::to_lower(extension);
+				if (extension != _T(".mp3")) {
+					tcout << _T("Skipping ") <<  p.string<tstring>() << std::endl;
 					continue;
-
+				}
 				TagFile(p);
 
 			} else if (fs::is_directory(p)) {
-				std::cout << "Directory: " << p.string() << std::endl;
+				tcout << _T("Directory: ") << p.string<tstring>() << std::endl;
 
 			} else {
-				std::cout << "Error reading: " << p.string() << std::endl;
+				tcout << _T("Error reading: ") << p.string<tstring>() << std::endl;
 			}
 		}
 	} catch (const fs::filesystem_error& ex) {
-		std::cout << ex.what() << std::endl;
+		tcout << ex.what() << std::endl;
 	}
 }
 
@@ -371,7 +389,7 @@ void FileTagger::TagDirectoryRecursive(fs::path files_dir)
 
 	try {
 		if (!fs::exists(files_dir) || !fs::is_directory(files_dir)) {
-			std::cout << "Invalid directory: " << files_dir.string() << std::endl;
+			tcout << _T("Invalid directory: ") << files_dir.string<tstring>() << std::endl;
 			return;
 		}
 
@@ -381,138 +399,140 @@ void FileTagger::TagDirectoryRecursive(fs::path files_dir)
 
 			if (fs::is_regular_file(p)) {
 
-				if (p.extension().string() != ".mp3")
+				if (p.extension().string<tstring>() != _T(".mp3"))
 					continue;
 
 				TagFile(p);
 
 			} else if (fs::is_directory(p)) {
-				std::cout << "Directory: " << p.string() << std::endl;
+				tcout << _T("Directory: ") << p.string<tstring>() << std::endl;
 
 			} else {
-				std::cout << "Error reading: " << p.string() << std::endl;
+				tcout << _T("Error reading: ") << p.string<tstring>() << std::endl;
 			}
 		}
 	} catch (const fs::filesystem_error& ex) {
-		std::cout << ex.what() << std::endl;
+		tcout << ex.what() << std::endl;
 	}
 }
 
-void FileTagger::TagFile(std::string file)
+void FileTagger::TagFile(tstring file)
 {
 	fs::path filepath(file);
 	TagFile(filepath);
 }
 
+
 void FileTagger::TagFile(fs::path file)
 {
-	fs::path filec = fs::canonical(file);
-	std::cout << "Canonical Path: " << filec << std::endl;
+	fs::path filec = fs::canonical(file).make_preferred().native();
 
-	ID3_Tag f(filec.string().c_str());
+	tcout << "Canonical Path: " << filec << std::endl;
+
+	//TagLib::FileRef f(filec.string().c_str());
+	TagLib::FileRef f(filec.string<tstring>().c_str());
+
 	if(!CheckEmptyFields(f)) {
-		std::cout << "Rejected: Non-Empty field(s)\n\n";
+		tcout << "Rejected: Non-Empty field(s)\n\n";
 		return;
 	}
 	Pattern::position_map fields;
 
-	std::string file_name;
+	fs::path::string_type file_name;
 	if(!ExtractRelevantFileName(filec, file_name)) {
-		std::cout << "Rejected: Filename path separator mismatch\n\n";
+		tcout << "Rejected: Filename path separator mismatch\n\n";
 		return;
 	}
-	std::cout << "RelevantFileName: " << file_name << std::endl;
+	std::wcout << "RelevantFileName: " << file_name << std::endl;
 
 	if(_pattern.match(file_name, fields))
 	{
 		UpdateTags(f, fields);
-		std::cout << "Done\n\n";
+		tcout << "Done\n\n";
 		return;
 	}
 
 }
 
-void FileTagger::UpdateTags(ID3_Tag &tag, Pattern::position_map &fieldmap)
+void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldmap)
 {
-
 	for (Pattern::position_map::iterator it = fieldmap.begin();	it!=fieldmap.end(); ++it) {
 		Field &field = it->second;
 
 		switch(field._type)
 		{
 		case Artist:
-			if(!_safe) ID3_AddArtist(&tag, field._content.c_str(), _replace);
-			std::cout << "Artist<-`" << field._content << "` | ";
+			if(!_safe) file.tag()->setArtist(field._content);
+			tcout << _T("Artist<-`") << field._content << _T("` | ");
 			break;
 		case Title:
-			if(!_safe) ID3_AddTitle(&tag, field._content.c_str(), _replace);
-			std::cout << "Title<-`" << field._content << "` | ";
+			if(!_safe) file.tag()->setTitle(field._content);
+			tcout << _T("Title<-`") << field._content << _T("` | ");
 			break;
 		case Album:
-			if(!_safe) ID3_AddAlbum(&tag, field._content.c_str(), _replace);
-			std::cout << "Album<-`" << field._content << "` | ";
+			if(!_safe) file.tag()->setAlbum(field._content);
+			tcout << _T("Album<-`") << field._content << _T("` | ");
 			break;
 		case Genre:
-			if(!_safe) ID3_AddGenre(&tag, field._content.c_str(), _replace);
-			std::cout << "Genre<-`" << field._content << "` | ";
+			if(!_safe) file.tag()->setGenre(field._content);
+			tcout << _T("Genre<-`") << field._content << _T("` | ");
 			break;
 		case Comment:
-			if(!_safe) ID3_AddComment(&tag, field._content.c_str(), _replace);
-			std::cout << "Comment<-`" << field._content << "` | ";
+			if(!_safe) file.tag()->setComment(field._content);
+			tcout << _T("Comment<-`") << field._content << _T("` | ");
 			break;
 		case TrackNo:
-			if(!_safe) ID3_AddTrack(&tag, atoi(field._content.c_str()), 0, _replace);
-			std::cout << "Track#<-`" << field._content << "` | ";
+			if(!_safe) file.tag()->setTrack(atoi(field.ToCharArr()));
+			tcout << _T("Track#<-`") << field._content << _T("` | ");
 			break;
 		case Year:
-			if(!_safe) ID3_AddYear(&tag, field._content.c_str(), _replace);
-			std::cout << "Year<-`" << field._content << "` | ";
+			if(!_safe) file.tag()->setYear(atoi(field.ToCharArr()));
+			tcout << _T("Year<-`") << field._content << _T("` | ");
 			break;
 
 		default:
 			break;
 		}
 	}
-	if(!_safe) tag.Update();
-
+	if(!_safe) file.save();
 }
 
-bool FileTagger::CheckEmptyFields(ID3_Tag &tag)
+bool FileTagger::CheckEmptyFields(TagLib::FileRef &file)
 {
-	for (std::vector<std::string>::iterator it = _empty_fields.begin();
+	for (std::vector<tstring>::iterator it = _empty_fields.begin();
 			it!=_empty_fields.end(); ++it) {
-		std::string &field = *it;
-
-		if	(	(field == "<Artist>" && !ID3_GetArtist(&tag))
-			|| 	(field == "<Title>" && !ID3_GetTitle(&tag))
-			|| 	(field == "<Album>" && !ID3_GetAlbum(&tag))
-			|| 	(field == "<Genre>" && !ID3_GetGenre(&tag))
-			|| 	(field == "<Comment>" && !ID3_GetComment(&tag))
-			|| 	(field == "<Year>" && !ID3_GetYear(&tag))
-			|| 	(field == "<Track#>" && !ID3_GetTrackNum(&tag)) )
+		tstring &field = *it;
+		if(		(field == _T("<Artist>") && !file.tag()->artist().isEmpty())
+			|| 	(field == _T("<Title>") && !file.tag()->title().isEmpty())
+			|| 	(field == _T("<Album>") && !file.tag()->album().isEmpty())
+			|| 	(field == _T("<Genre>") && !file.tag()->genre().isEmpty())
+			|| 	(field == _T("<Comment>") && !file.tag()->comment().isEmpty())
+			|| 	(field == _T("<Year>") && !file.tag()->year())
+			|| 	(field == _T("<Track#>") && !file.tag()->track()) )
 			return false;
 	}
 	return true;
 }
 
-bool FileTagger::ExtractRelevantFileName(fs::path file_path, std::string &out)
+
+bool FileTagger::ExtractRelevantFileName(fs::path file_path, tstring &out)
 {
-	out = "";
+	out = _T("");
 	size_t nSeparators = _pattern.get_separator_count();
 	if(nSeparators)
 	{
 		size_t nTokens = _pattern.begins_with_separator() ? nSeparators-1 : nSeparators;
 		//Explode path
-		std::string parentpath = file_path.parent_path().string();
-		std::vector<std::string> tokens;
-		boost::split(tokens, parentpath, boost::is_any_of("/\\"));
+		tstring parentpath = file_path.parent_path().string<tstring>();
+		std::vector<tstring> tokens;
+		boost::split(tokens, parentpath, boost::is_any_of(_T("/\\")));
 		if(nTokens > tokens.size())
 			return false;
 		boost::filesystem::path slash("/");
-		std::string platform_slash = slash.make_preferred().native();
+		fs::path::string_type platform_slash = slash.make_preferred().native();
 
 		if(_pattern.begins_with_separator())
-			out += platform_slash;
+			out.append(platform_slash);
 		while(!tokens.empty() && nTokens)
 		{
 			--nTokens;
@@ -522,6 +542,6 @@ bool FileTagger::ExtractRelevantFileName(fs::path file_path, std::string &out)
 		}
 
 	}
-	 out += file_path.stem().string();
+	 out += file_path.stem().string<tstring>();
 	 return true;
 }
