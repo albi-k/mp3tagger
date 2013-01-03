@@ -305,7 +305,7 @@ FileTagger::~FileTagger()
 
 }
 
-void FileTagger::SetEmptyFieldConstraint(std::vector<tstring> empty_fields)
+void FileTagger::SetEmptyFieldConstraint(std::vector<tstring> &empty_fields)
 {
 	_empty_fields = empty_fields;
 }
@@ -438,12 +438,12 @@ void FileTagger::TagFile(fs::path file)
 	}
 	Pattern::position_map fields;
 
-	fs::path::string_type file_name;
+	tstring file_name;
 	if(!ExtractRelevantFileName(filec, file_name)) {
 		tcout << "Rejected: Filename path separator mismatch\n\n";
 		return;
 	}
-	std::wcout << "RelevantFileName: " << file_name << std::endl;
+	tcout << _T("RelevantFileName: ") << file_name << std::endl;
 
 	if(_pattern.match(file_name, fields))
 	{

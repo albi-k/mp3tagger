@@ -13,9 +13,6 @@
 #include "FileTagger.h"
 #include "common.h"
 
-namespace po = boost::program_options;
-
-
 
 int main(int argc, char **argv) {
 	tstring c_directory;
@@ -29,12 +26,12 @@ int main(int argc, char **argv) {
 
 	//Add options
 	desc.add_options()	("help,h", "this message")
-						("pattern,p", po::wvalue<tstring>(), "pattern to match")
+						("pattern,p", po::tvalue<tstring>(), "pattern to match")
 						("recursive,r", "recursive iteration")
-						("trim,t", po::wvalue<tstring>()->implicit_value(_T(" "), " "), "remove leading and trailing space from fields")
+						("trim,t", po::tvalue<tstring>()->implicit_value(_T(" "), " "), "remove leading and trailing space from fields")
 						("safe,s", "safe mode, do not update files")
-						("empty,e", po::wvalue<std::vector<tstring> >(), "only update tags if the tag specified with this option is initially empty")
-						("directory,d", po::wvalue<tstring>(&c_directory)->required(), "path to folder (required)");
+						("empty,e", po::tvalue<std::vector<tstring> >(), "only update tags if the tag specified with this option is initially empty")
+						("directory,d", po::tvalue<tstring>(&c_directory)->required(), "path to folder (required)");
 
 	po::positional_options_description positionalOptions;
 	positionalOptions.add("directory", 1);

@@ -12,22 +12,25 @@
 
 //////////////////////////////////////////////////
 #include <boost/filesystem.hpp>
+#include "boost/program_options.hpp"
 namespace fs = boost::filesystem;
+namespace po = boost::program_options;
 
 #   ifdef BOOST_WINDOWS_API
     typedef wchar_t										char_type;
 	#define tcout 										std::wcout
 	#define tcerr 										std::wcerr
 	#define _T(x)										L ##x
+	#define tvalue										wvalue
 #   else
-    typedef char_t										char_type;
+    typedef char										char_type;
     #define tcout 										std::cout
 	#define tcerr 										std::cerr
 	#define _T(x) 										x
+	#define tvalue										value
 #   endif
 
-    typedef std::basic_string<char_type>               tstring;
-
+    typedef std::basic_string<char_type>				tstring;
 
 bool isField(tstring field);
 

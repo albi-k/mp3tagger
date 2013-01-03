@@ -85,7 +85,7 @@ public:
 	FileTagger(Pattern &p, bool replace_non_empty=true);
 	virtual ~FileTagger();
 
-	void SetEmptyFieldConstraint(std::vector<tstring> empty_fields);
+	void SetEmptyFieldConstraint(std::vector<tstring> &empty_fields);
 	void SetSafeMode(bool safe_mode);
 	void Tag(tstring path, bool recursive);
 	void TagDirectory(tstring dir, bool recursive);
