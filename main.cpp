@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
 		}
 		if (vm.count("safe")) {
 			c_safe = true;
-			log << "Safe mode is on" << std::endl;
+			Log << "Safe mode is on" << std::endl;
 		}
 		if (vm.count("threads")) {
 			c_thread_count = vm["threads"].as<unsigned int>();

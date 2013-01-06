@@ -45,8 +45,9 @@ struct Exc : public std::exception
 };
 
 ////////////////////////////////////////////////////////
+#define BOOST_THREAD_USE_LIB
 
-#include <boost/thread.hpp>
+#include <boost/thread/thread.hpp>
 #include <sstream>
 #include <ostream>
 #include <iostream>
@@ -55,20 +56,13 @@ class atomic_message
 	: public std::basic_ostringstream<char_type>
 {
 public:
-
-    ~atomic_message()
-    {
-		boost::lock_guard<boost::mutex> lock(s_mtx);
-        tcout << boost::this_thread::get_id() <<  ">\t" << str();
-		tcout.flush();
-    }
-
+    ~atomic_message();
 private:
 	static boost::mutex s_mtx;
 };
 
-#define log_type atomic_message
-#define log atomic_message()
+#define LogType atomic_message
+#define Log atomic_message().flush()
 
 /////////////////////////////////////////////////////////
 

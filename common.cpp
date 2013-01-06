@@ -40,6 +40,13 @@ bool isField(tstring field)
 
 boost::mutex atomic_message::s_mtx;
 
+atomic_message::~atomic_message()
+{
+	boost::lock_guard<boost::mutex> lock(s_mtx);
+	tcout << boost::this_thread::get_id() <<  ">\t" << str();
+	tcout.flush();
+}
+
 /////////////////////////////////////////////
 
 #ifdef BOOST_WINDOWS_API
@@ -54,7 +61,6 @@ boost::mutex atomic_message::s_mtx;
 	#include <pthread.h>
 	void HardKill(boost::thread *thread)
 	{
-		pthread_cancel(thread->native_handle())
-        return;
+		pthread_cancel(thread->native_handle());
 	}
 #endif
