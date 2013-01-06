@@ -102,7 +102,7 @@ bool Pattern::parse()
 	_nDelFields = 0;
 	_nPathSeparators = 0;
 	_structure.clear();
-	_delimiters.clear();
+	_delimiters_generic.clear();
 
 	//Find all occurrences of the allowed fields
 	Field title(_T("<Title>"), Title);
@@ -154,7 +154,7 @@ bool Pattern::parse()
 	if(tail) parse_helper(_pattern.size(), 0, pos, size);
 
 
-	_structure.insert(_delimiters.begin(), _delimiters.end());
+	_structure.insert(_delimiters_generic.begin(), _delimiters_generic.end());
 	return true;
 }
 
@@ -197,32 +197,31 @@ bool Pattern::parse_helper(size_t pos, size_t size, size_t prev_pos, size_t prev
 			return false;
 	}
 	Field del(delimiter, Delimiter);
-	_delimiters.insert(std::pair<size_t,Field>(del_start, del));
+	_delimiters_generic.insert(std::pair<size_t,Field>(del_start, del));
 	++_nDelFields;
 	if(delimiter==_T("/") || delimiter==_T("\\"))
 		++_nPathSeparators;
 	return true;
 }
 
-bool Pattern::match(tstring &file_str, position_map &out)
+bool Pattern::match(tstring &file_str, position_map &out) const
 {
 	typedef std::vector<std::pair<size_t,size_t> > intervals;
 	intervals field_intervals;
 	position_map delimiters;
 	size_t pos = 0;
 	//Ensure sequence of delimiters exists
-	for(position_map::iterator it = _delimiters.begin(); it != _delimiters.end(); ++it)
+	for(position_map::const_iterator it = _delimiters_generic.cbegin(); it != _delimiters_generic.cend(); ++it)
 	{
-		Field &field = it->second;
+		const Field &field = it->second;
 		pos = file_str.find(field._content, pos);
 		if(pos == tstring::npos) {
-			tcout << "Rejected: Delimiter `" << field._content << "` not found\n\n";
+			log << _T("Rejected: Delimiter `") << field._content << _T("` not found\n\n");
 			return false;
 		}
 		delimiters.insert(std::pair<size_t,Field>(pos, field));	//insert delimiter
 		++pos;
 	}
-	//TODO:check for existence of additional delimiters
 
 	//Extract non-delimiter field ranges
 	size_t idx_start = 0;
@@ -241,12 +240,12 @@ bool Pattern::match(tstring &file_str, position_map &out)
 		field_intervals.push_back(std::pair<size_t,size_t>(idx_start, file_str.size()));
 
 	if(_nNamedFields != field_intervals.size()) {
-		tcout << "Rejected: Field count mismatch\n\n";
+		log << _T("Rejected: Field count mismatch\n\n");
 		return false;
 	}
 	//Extract fields
 	int n = 0;
-	for(position_map::iterator it = _structure.begin(); it != _structure.end(); ++it)
+	for(position_map::const_iterator it = _structure.cbegin(); it != _structure.cend(); ++it)
 	{
 		Field field = it->second;
 		if(field._type == Delimiter)
@@ -261,23 +260,25 @@ bool Pattern::match(tstring &file_str, position_map &out)
 	return true;
 }
 
-void Pattern::print()
+void Pattern::print() const
 {
 	if(!_valid) {
-		tcout << "Pattern::print(): Invalid pattern" << std::endl;
+		log << _T("Pattern::print(): Invalid pattern") << std::endl;
 		return;
 	}
-	tcout << "Trim=" << _trim << std::endl;
-	for(position_map::iterator it = _structure.begin(); it != _structure.end(); ++it)
+	log << _T("Trim=") << _trim << std::endl;
+	
+	for(position_map::const_iterator it = _structure.cbegin(); it != _structure.cend(); ++it)
 	{
-			size_t pos = it->first;
-			Field &field = it->second;
-			tcout << "Type " << FieldTypeToString(field._type);
-			if(field._type == Delimiter)
-				tcout << "`" << field._content << "`";
-			tcout << " at pos= " << pos << std::endl;
+		log_type mylog = log;
+		size_t pos = it->first;
+		const Field &field = it->second;
+		mylog << _T("Type ") << FieldTypeToString(field._type);
+		if(field._type == Delimiter)
+			mylog << _T("`") << field._content << _T("`");
+		mylog << _T(" at pos= ") << pos << std::endl;
 	}
-	tcout << std::endl;
+
 }
 
 bool Pattern::begins_with_separator()
@@ -296,6 +297,7 @@ FileTagger::FileTagger(Pattern &p, bool replace_non_empty)
 : _pattern(p)
 , _safe(false)
 , _replace(replace_non_empty)
+, _threads_max(1)
 {
 
 }
@@ -314,40 +316,52 @@ void FileTagger::SetSafeMode(bool safe_mode)
 {
 	_safe = safe_mode;
 }
-//TODO: DUPLICATE FIELDS
+
+
 void FileTagger::Tag(tstring path, bool recursive)
 {
+	_done = false;
 	fs::path path_to_dir_or_file = fs::path(path);
 	try
 	{
 		if (!fs::exists(path_to_dir_or_file)) {
-			tcout << _T("Invalid path: ") << path_to_dir_or_file.string<tstring>() << std::endl;
+			log << _T("Invalid path: ") << path_to_dir_or_file.string<tstring>() << std::endl;
 			return;
 		}
 
 		if(fs::is_directory(path_to_dir_or_file))
 		{
-			TagDirectory(path, recursive);
+			recursive ? TagDirectoryRecursive(path) : TagDirectory(path);
 		}
 		else if (fs::is_regular_file(path_to_dir_or_file))
 		{
-			TagFile(path_to_dir_or_file);
+				TagFileOnThread(path_to_dir_or_file);
 		}
 		else
-			tcout << _T("Invalid path: ") << path_to_dir_or_file.string<tstring>() << std::endl;
+			log << _T("Invalid path: ") << path_to_dir_or_file.string<tstring>() << std::endl;
+
+		_done = true;
+
+		while(!_threads.empty()) {
+			for(threadlist::const_iterator it = _threads.cbegin(); it !=_threads.cend();)
+			{
+				boost::thread* thread = it->first;
+				time_t last_alive = it->second;
+				threadlist::const_iterator it_prev = it;
+				++it;
+				if(last_alive < time(NULL) - 5) {	//consider dead
+					//terminate
+					HardKill(thread);
+					_threads.remove(*it_prev);
+					NewThread();
+				}
+			}
+			boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+		}
 
 	} catch (const fs::filesystem_error& ex) {
-		tcout << ex.what() << std::endl;
+		log << ex.what() << std::endl;
 	}
-}
-
-void FileTagger::TagDirectory(tstring dir, bool recursive)
-{
-	fs::path files_dir = fs::absolute(fs::path(dir));
-	if(recursive)
-		TagDirectoryRecursive(files_dir);
-	else
-		TagDirectory(files_dir);
 }
 
 void FileTagger::TagDirectory(fs::path files_dir)
@@ -355,7 +369,7 @@ void FileTagger::TagDirectory(fs::path files_dir)
 
 	try {
 		if (!fs::exists(files_dir) || !fs::is_directory(files_dir)) {
-			tcout << _T("Invalid directory: ") << files_dir.string<tstring>() << std::endl;
+			log << _T("Invalid directory: ") << files_dir.string<tstring>() << std::endl;
 			return;
 		}
 
@@ -367,20 +381,21 @@ void FileTagger::TagDirectory(fs::path files_dir)
 				tstring extension = p.extension().string<tstring>();
 				boost::algorithm::to_lower(extension);
 				if (extension != _T(".mp3")) {
-					tcout << _T("Skipping ") <<  p.string<tstring>() << std::endl;
+					log << _T("Skipping ") <<  p.string<tstring>() << std::endl;
 					continue;
 				}
-				TagFile(p);
+				
+				TagFileOnThread(p);
 
 			} else if (fs::is_directory(p)) {
-				tcout << _T("Directory: ") << p.string<tstring>() << std::endl;
+				log << _T("Directory: ") << p.string<tstring>() << std::endl;
 
 			} else {
-				tcout << _T("Error reading: ") << p.string<tstring>() << std::endl;
+				log << _T("Error reading: ") << p.string<tstring>() << std::endl;
 			}
 		}
 	} catch (const fs::filesystem_error& ex) {
-		tcout << ex.what() << std::endl;
+		log << ex.what() << std::endl;
 	}
 }
 
@@ -389,7 +404,7 @@ void FileTagger::TagDirectoryRecursive(fs::path files_dir)
 
 	try {
 		if (!fs::exists(files_dir) || !fs::is_directory(files_dir)) {
-			tcout << _T("Invalid directory: ") << files_dir.string<tstring>() << std::endl;
+			log << _T("Invalid directory: ") << files_dir.string<tstring>() << std::endl;
 			return;
 		}
 
@@ -402,59 +417,84 @@ void FileTagger::TagDirectoryRecursive(fs::path files_dir)
 				if (p.extension().string<tstring>() != _T(".mp3"))
 					continue;
 
-				TagFile(p);
+				TagFileOnThread(p);
 
 			} else if (fs::is_directory(p)) {
-				tcout << _T("Directory: ") << p.string<tstring>() << std::endl;
+				log << _T("Directory: ") << p.string<tstring>() << std::endl;
 
 			} else {
-				tcout << _T("Error reading: ") << p.string<tstring>() << std::endl;
+				log << _T("Error reading: ") << p.string<tstring>() << std::endl;
 			}
 		}
 	} catch (const fs::filesystem_error& ex) {
-		tcout << ex.what() << std::endl;
+		log << ex.what() << std::endl;
 	}
 }
 
-void FileTagger::TagFile(tstring file)
+void FileTagger::NewThread()
 {
-	fs::path filepath(file);
-	TagFile(filepath);
+	if(_threads.size() < _threads_max) {
+		thread_info_type new_thread(NULL, time(NULL));
+		_threads.push_back(new_thread);
+		std::pair<boost::thread*, time_t> &thread_info = _threads.back();
+		thread_info.second = time(NULL);
+
+		thread_info.first = new boost::thread(boost::bind(&FileTagger::_thread_func, this, &thread_info.second));
+	}
+}
+void FileTagger::TagFileOnThread(fs::path file)
+{
+	NewThread();
+	boost::lock_guard<boost::mutex> lock(_mtx);
+	_work_queue.push_back(file);
 }
 
-
-void FileTagger::TagFile(fs::path file)
+void FileTagger::_thread_func(time_t *last_alive)
+{
+	while(!_done || !_work_queue.empty()) {
+		time(last_alive);
+		fs::path file;
+		{
+			boost::lock_guard<boost::mutex> lock(_mtx);
+			if(_work_queue.empty())
+				continue;
+			file = _work_queue.front();
+			_work_queue.pop_front();
+		}
+		TagFile(file);
+	}
+}
+void FileTagger::TagFile(fs::path file) const
 {
 	fs::path filec = fs::canonical(file).make_preferred().native();
 
-	tcout << "Canonical Path: " << filec << std::endl;
+	log << filec << std::endl;
 
-	//TagLib::FileRef f(filec.string().c_str());
 	TagLib::FileRef f(filec.string<tstring>().c_str());
 
 	if(!CheckEmptyFields(f)) {
-		tcout << "Rejected: Non-Empty field(s)\n\n";
+		log << "Rejected: Non-Empty field(s)\n\n";
 		return;
 	}
 	Pattern::position_map fields;
 
 	tstring file_name;
 	if(!ExtractRelevantFileName(filec, file_name)) {
-		tcout << "Rejected: Filename path separator mismatch\n\n";
+		log << "Rejected: Filename path separator mismatch\n\n";
 		return;
 	}
-	tcout << _T("RelevantFileName: ") << file_name << std::endl;
+	log << _T("RelevantFileName: ") << file_name << std::endl;
 
 	if(_pattern.match(file_name, fields))
 	{
 		UpdateTags(f, fields);
-		tcout << "Done\n\n";
+		log << "Done\n\n";
 		return;
 	}
 
 }
 
-void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldmap)
+void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldmap) const
 {
 	for (Pattern::position_map::iterator it = fieldmap.begin();	it!=fieldmap.end(); ++it) {
 		Field &field = it->second;
@@ -463,31 +503,31 @@ void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldm
 		{
 		case Artist:
 			if(!_safe) file.tag()->setArtist(field._content);
-			tcout << _T("Artist<-`") << field._content << _T("` | ");
+			log << _T("Artist = `") << field._content << _T("`") << std::endl;
 			break;
 		case Title:
 			if(!_safe) file.tag()->setTitle(field._content);
-			tcout << _T("Title<-`") << field._content << _T("` | ");
+			log << _T("Title = `") << field._content << _T("`") << std::endl;
 			break;
 		case Album:
 			if(!_safe) file.tag()->setAlbum(field._content);
-			tcout << _T("Album<-`") << field._content << _T("` | ");
+			log << _T("Album = `") << field._content << _T("`") << std::endl;
 			break;
 		case Genre:
 			if(!_safe) file.tag()->setGenre(field._content);
-			tcout << _T("Genre<-`") << field._content << _T("` | ");
+			log << _T("Genre = `") << field._content << _T("`") << std::endl;
 			break;
 		case Comment:
 			if(!_safe) file.tag()->setComment(field._content);
-			tcout << _T("Comment<-`") << field._content << _T("` | ");
+			log << _T("Comment = `") << field._content << _T("`") << std::endl;
 			break;
 		case TrackNo:
 			if(!_safe) file.tag()->setTrack(atoi(field.ToCharArr()));
-			tcout << _T("Track#<-`") << field._content << _T("` | ");
+			log << _T("Track# = `") << field._content << _T("`") << std::endl;
 			break;
 		case Year:
 			if(!_safe) file.tag()->setYear(atoi(field.ToCharArr()));
-			tcout << _T("Year<-`") << field._content << _T("` | ");
+			log << _T("Year = `") << field._content << _T("`") << std::endl;
 			break;
 
 		default:
@@ -497,11 +537,11 @@ void FileTagger::UpdateTags(TagLib::FileRef &file, Pattern::position_map &fieldm
 	if(!_safe) file.save();
 }
 
-bool FileTagger::CheckEmptyFields(TagLib::FileRef &file)
+bool FileTagger::CheckEmptyFields(TagLib::FileRef &file) const
 {
-	for (std::vector<tstring>::iterator it = _empty_fields.begin();
-			it!=_empty_fields.end(); ++it) {
-		tstring &field = *it;
+	for (std::vector<tstring>::const_iterator it = _empty_fields.cbegin();
+			it!=_empty_fields.cend(); ++it) {
+		const tstring &field = *it;
 		if(		(field == _T("<Artist>") && !file.tag()->artist().isEmpty())
 			|| 	(field == _T("<Title>") && !file.tag()->title().isEmpty())
 			|| 	(field == _T("<Album>") && !file.tag()->album().isEmpty())
@@ -515,7 +555,7 @@ bool FileTagger::CheckEmptyFields(TagLib::FileRef &file)
 }
 
 
-bool FileTagger::ExtractRelevantFileName(fs::path file_path, tstring &out)
+bool FileTagger::ExtractRelevantFileName(fs::path file_path, tstring &out) const
 {
 	out = _T("");
 	size_t nSeparators = _pattern.get_separator_count();

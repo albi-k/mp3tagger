@@ -36,3 +36,25 @@ bool isField(tstring field)
 	return false;
 }
 
+/////////////////////////////////////////////
+
+boost::mutex atomic_message::s_mtx;
+
+/////////////////////////////////////////////
+
+#ifdef BOOST_WINDOWS_API
+	#include <windows.h>
+	void HardKill(boost::thread *thread)
+	{
+		TerminateThread(thread->native_handle(), EXIT_SUCCESS);
+        return;
+	}
+
+#else
+	#include <pthread.h>
+	void HardKill(boost::thread *thread)
+	{
+		pthread_cancel(thread->native_handle())
+        return;
+	}
+#endif

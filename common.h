@@ -35,6 +35,7 @@ namespace po = boost::program_options;
 bool isField(tstring field);
 
 ////////////////////////////////////////////////////////
+
 struct Exc : public std::exception
 {
    std::string s;
@@ -42,6 +43,36 @@ struct Exc : public std::exception
    virtual ~Exc() throw();
    const char* what() const throw();
 };
+
+////////////////////////////////////////////////////////
+
+#include <boost/thread.hpp>
+#include <sstream>
+#include <ostream>
+#include <iostream>
+
+class atomic_message 
+	: public std::basic_ostringstream<char_type>
+{
+public:
+
+    ~atomic_message()
+    {
+		boost::lock_guard<boost::mutex> lock(s_mtx);
+        tcout << boost::this_thread::get_id() <<  ">\t" << str();
+		tcout.flush();
+    }
+
+private:
+	static boost::mutex s_mtx;
+};
+
+#define log_type atomic_message
+#define log atomic_message()
+
+/////////////////////////////////////////////////////////
+
+void HardKill(boost::thread *thread);
 
 
 #endif /* COMMON_H_ */

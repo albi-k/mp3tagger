@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
 	tstring c_trim_chars;
 	std::vector<tstring> c_empty_v;
 	bool c_trim = false, c_safe = false,  c_recursive = false;
+	unsigned int c_thread_count = 1;
 	/////////
 	std::string prog = "Tag Mp3 files from filename";
 	po::options_description desc(prog);
@@ -30,6 +31,7 @@ int main(int argc, char **argv) {
 						("recursive,r", "recursive iteration")
 						("trim,t", po::tvalue<tstring>()->implicit_value(_T(" "), " "), "remove leading and trailing space from fields")
 						("safe,s", "safe mode, do not update files")
+						("threads", po::tvalue<unsigned int>(), "number of worker threads (default = 1)")
 						("empty,e", po::tvalue<std::vector<tstring> >(), "only update tags if the tag specified with this option is initially empty")
 						("directory,d", po::tvalue<tstring>(&c_directory)->required(), "path to folder (required)");
 
@@ -56,7 +58,10 @@ int main(int argc, char **argv) {
 		}
 		if (vm.count("safe")) {
 			c_safe = true;
-			tcout << "Safe mode is on" << std::endl;
+			log << "Safe mode is on" << std::endl;
+		}
+		if (vm.count("threads")) {
+			c_thread_count = vm["threads"].as<unsigned int>();
 		}
 		if (vm.count("empty")) {
 			c_empty_v = vm["empty"].as< std::vector<tstring> >();
@@ -82,12 +87,13 @@ int main(int argc, char **argv) {
 		FileTagger tagger(p);
 		tagger.SetEmptyFieldConstraint(c_empty_v);
 		tagger.SetSafeMode(c_safe);
+		tagger.SetThreadCount(c_thread_count);
 		tagger.Tag(c_directory, c_recursive);
 		//
 	} catch (std::exception& e) {
 		if (!vm.count("help")) {
-			tcerr << "Error: " << e.what() << std::endl;
-			tcerr << "Try -h or --help for help." << std::endl;
+			tcout << "Error: " << e.what() << std::endl;
+			tcout << "Try -h or --help for help." << std::endl;
 			return -1;
 		}
 
